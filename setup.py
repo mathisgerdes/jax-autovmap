@@ -8,7 +8,7 @@ setup(
     author='Mathis Gerdes',
     author_email='MathisGerdes@gmail.com',
     packages=['autovmap'],
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     install_requires=[
         'jax>=0.2.20',
         'jaxlib>=0.1.69',

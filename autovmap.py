@@ -9,11 +9,10 @@ from typing import Union
 
 _CONVERT_ARRAY_TYPES = (list, int, float, complex, chex.Array)
 
-_arg_type = Union[dict[Union[str, int], int], int, tuple[int, ...], None]
-_kwarg_type = int
 
-
-def autovmap(*args: _arg_type, **kwargs: _kwarg_type):
+def autovmap(
+        *args: Union[dict[Union[str, int], int], int, tuple[int, ...], None],
+        **kwargs: int):
     """Decorator: dynamically vmap over arguments of a function.
 
     Possible signatures:
