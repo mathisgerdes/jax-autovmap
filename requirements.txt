@@ -1,5 +1,0 @@
-setuptools~=58.1.0
-chex~=0.1.0
-jax~=0.2.28
-jaxlib~=0.1.76
-numpy>=1.21.0
