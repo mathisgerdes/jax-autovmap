@@ -5,6 +5,7 @@ import inspect
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jax import tree_util
 from inspect import signature
 from functools import wraps, partial
 from typing import Optional, Union, Callable, Any
@@ -63,7 +64,7 @@ def _collect_ranks(
 
 def _vmap_wrapped(fun, sig, vmap_count, *args):
     """Wrap function in vmap according to counts needed per argument."""
-    vmap_depth = max(jax.tree_leaves(vmap_count))
+    vmap_depth = max(tree_util.tree_leaves(vmap_count))
 
     def wrapped(*all_args):
         # Effectively converts function which may have keyword-only arguments
@@ -79,7 +80,7 @@ def _vmap_wrapped(fun, sig, vmap_count, *args):
         return fun(*bound.args, **bound.kwargs)
 
     for level in range(vmap_depth):
-        axes = jax.tree_map(partial(_vmap_axes, level=level), vmap_count)
+        axes = tree_util.tree_map(partial(_vmap_axes, level=level), vmap_count)
         wrapped = jax.vmap(wrapped, in_axes=axes)
 
     return wrapped(*args)
@@ -172,13 +173,13 @@ def auto_vmap(*ranks_pos: Union[int, Any, None],
                 if isinstance(arg, (jnp.ndarray, np.ndarray)):
                     vmap_count = _vmap_count(arg, rank, name)
                 elif isinstance(rank, int):
-                    leaves, treedef = jax.tree_flatten(arg)
+                    leaves, treedef = tree_util.tree_flatten(arg)
                     vmap_count = tuple(
                         _vmap_count(leave, rank, name) for leave in leaves)
                     vmap_count = treedef.unflatten(vmap_count)
                 else:
-                    leaves, treedef = jax.tree_flatten(arg)
-                    rank_leaves = jax.tree_leaves(rank)
+                    leaves, treedef = tree_util.tree_flatten(arg)
+                    rank_leaves = tree_util.tree_leaves(rank)
                     vmap_count = tuple(
                         _vmap_count(leave, r, name)
                         for leave, r in zip(leaves, rank_leaves))
