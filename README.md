@@ -1,4 +1,5 @@
 [![Tests](https://github.com/mathisgerdes/autovmap/actions/workflows/python-pytest.yml/badge.svg)](https://github.com/mathisgerdes/autovmap/actions/workflows/python-package.yml)
+[![PyPI](https://img.shields.io/pypi/v/jax-autovmap)](https://pypi.org/project/jax-autovmap/)
 # Automatically broadcast via JAX vmap
 
 Automatically broadcast a function that takes inputs of specific ranks to accept any batch dimensions using `jax.vmap`.
