@@ -1,7 +1,9 @@
+from unittest import TestCase
+
 import jax.numpy as jnp
 import numpy as np
+
 from jax_autovmap import auto_vmap
-from unittest import TestCase
 
 
 class AutoVmapTests(TestCase):
@@ -19,8 +21,8 @@ class AutoVmapTests(TestCase):
     def test_basic(self):
 
         def foo(x, y, val=1):
-            self.assertEqual(x.ndim, 2)
-            self.assertEqual(y.ndim, 0)
+            self.assertEqual(jnp.ndim(x), 2)
+            self.assertEqual(jnp.ndim(y), 0)
             return val
 
         # args, kwargs
@@ -35,27 +37,41 @@ class AutoVmapTests(TestCase):
             vmapped = auto_vmap(*args, **kwargs)(foo)
 
             # no vmap
-            self.assertEqual(vmapped(jnp.zeros((3, 3)), 0.0), 1)
+            self.assertEqual(
+                vmapped(jnp.zeros((3, 3)), 0.0),
+                1,
+            )
             # vmap second arg
-            self.assertAllEqual(vmapped(jnp.zeros((3, 3)), [0.0, 1.0, 2.0]),
-                                [1, 1, 1])
+            self.assertAllEqual(
+                vmapped(jnp.zeros((3, 3)), jnp.array([0.0, 1.0, 2.0])),
+                np.ones([3]),
+            )
             # vmap first arg
-            self.assertAllEqual(vmapped(jnp.zeros((5, 3, 3)), 0),
-                                [1, 1, 1, 1, 1])
-            self.assertAllEqual(vmapped(jnp.zeros((5, 3, 3)), 0, val=0),
-                                [0, 0, 0, 0, 0])
-            self.assertAllEqual(vmapped(jnp.zeros((5, 3, 3)), 0, 0),
-                                [0, 0, 0, 0, 0])
+            self.assertAllEqual(
+                vmapped(jnp.zeros((5, 3, 3)), 0),
+                np.ones([5]),
+            )
+            self.assertAllEqual(
+                vmapped(jnp.zeros((5, 3, 3)), 0, val=0),
+                np.zeros([5]),
+            )
+            self.assertAllEqual(
+                vmapped(jnp.zeros((5, 3, 3)), 0, 0),
+                np.zeros([5]),
+            )
             # vmap both args
             self.assertAllEqual(
                 vmapped(jnp.zeros((5, 3, 3)), jnp.zeros(5), 3),
-                np.full(5, 3))
+                np.full(5, 3),
+            )
             self.assertAllEqual(
                 vmapped(jnp.zeros((2, 5, 3, 3)), jnp.zeros(5), 3),
-                np.full((2, 5), 3))
+                np.full((2, 5), 3),
+            )
             self.assertAllEqual(
                 vmapped(jnp.zeros((3, 3, 3)), jnp.zeros((4, 3)), 7),
-                np.full((4, 3), 7))
+                np.full((4, 3), 7),
+            )
 
     def test_pytree(self):
         def sum_ranks(objects, offset):
