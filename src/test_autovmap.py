@@ -82,7 +82,7 @@ class AutoVmapTests(TestCase):
 
         names = 'abcde'
         ranks = [2, 5, 1, 2, 3]
-        obj = {n: np.ones((2,)*r) for r, n in zip(ranks, names)}
+        obj = {n: np.ones((2,) * r) for r, n in zip(ranks, names)}
 
         # each is rank 5 so the sum is just the number of arguments
         total = auto_vmap(1, 0)(sum_ranks)(obj, 0)
@@ -94,7 +94,7 @@ class AutoVmapTests(TestCase):
         # rank is 2 so two times the number of arguments
         names = 'abcd'
         ranks = [2, 5, 3, 2]
-        obj = {n: np.ones((2,)*r) for r, n in zip(ranks, names)}
+        obj = {n: np.ones((2,) * r) for r, n in zip(ranks, names)}
         total = auto_vmap(2, 0)(sum_ranks)(obj, 0)
         self.assertEqual(total.ndim, max(ranks) - 2)
         self.assertAllEqual(total, 2 * len(ranks))

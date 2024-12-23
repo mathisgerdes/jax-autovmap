@@ -10,7 +10,7 @@ The transformed function takes any broadcastable combination of batched inputs a
 One could equivalently apply `vmap` by hand, however the in-axes have to be chosen differently for different inputs.
 The decorator takes care of this automatically; if the underlying ranks are known, batch dimensions can be inferred.
 
-## Example
+## Examples
 
 Consider the following function which takes numeric arguments with fixed and known ranks as input:
 ```python
@@ -71,4 +71,17 @@ def foo(inputs):
     return inputs['v'] @ inputs['m'] @ inputs['v'] + inputs['s']
 
 foo(dict(s=s, v=v, m=m))
+```
+
+Just like NumPy broadcasting, it is also allowed that one of the "vmap'ed" arguments has length 1:
+```python
+s = jnp.array(2.0)
+v = jnp.ones((7, 1, 3))  # broadcast second axis with vmap over 5 values of `m`
+m = jnp.ones((7, 5, 3, 3))
+
+@auto_vmap(s=0, v=1, m=2)
+def foo(s, v, m):
+    return v @ m @ v + s
+
+foo(s, v, m)  # shape (7, 5)
 ```

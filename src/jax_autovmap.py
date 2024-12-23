@@ -37,6 +37,41 @@ def _vmap_axes(vmap_rank, level):
     return 0 if vmap_rank > level else None
 
 
+def _broadcast_vmap(fn, in_axes):
+    """Functions like vmap, except axes are allowed to be size 1 for broadcasting.
+
+    Additionally assumes in_axes are all either 0 or None.
+    """
+    def _wrapped(*args):
+        args_squeezed = []
+        axes_squeezed = []
+        do_squeeze = False
+        for arg, ax in zip(args, in_axes):
+            arg_leaves, treedef = jax.tree.flatten(arg)
+            if ax is None or isinstance(ax, int):
+                ax_leaves = [ax] * len(arg_leaves)
+            else:
+                ax_leaves = treedef.flatten_up_to(ax)
+
+            for i, (arg_leaf, ax_leaf) in enumerate(zip(arg_leaves, ax_leaves, strict=True)):
+                if jnp.shape(arg_leaf) == ():
+                    assert ax_leaf is None, 'cannot vmap over scalar value'
+                elif ax_leaf is not None:
+                    if len(arg_leaf) == 1:
+                        arg_leaves[i] = jnp.squeeze(arg_leaf, 0)
+                        ax_leaves[i] = None  # exclude from vmap
+                    # only use squeezed args if at least one array has len > 1
+                    else:
+                        do_squeeze = True
+
+            args_squeezed.append(treedef.unflatten(arg_leaves))
+            axes_squeezed.append(treedef.unflatten(ax_leaves))
+        if do_squeeze:
+            return jax.vmap(fn, in_axes=axes_squeezed)(*args_squeezed)
+        return jax.vmap(fn, in_axes=in_axes)(*args)
+    return _wrapped
+
+
 def _collect_ranks(
         fun: Callable,
         rspec: Union[dict[str, Optional[int]], tuple[Optional[int], ...]]) \
@@ -86,7 +121,7 @@ def _vmap_wrapped(fun, sig, vmap_count, *args):
 
     for level in range(vmap_depth):
         axes = jax.tree.map(partial(_vmap_axes, level=level), vmap_count)
-        wrapped = jax.vmap(wrapped, in_axes=axes)
+        wrapped = _broadcast_vmap(wrapped, in_axes=axes)
 
     return wrapped(*args)
 
@@ -97,11 +132,11 @@ def auto_vmap(*ranks_pos: Union[int, Any, None],
 
     Given a function with some arguments that have known
     fundamental ranks, we want make it take any batched inputs.
-    This is meant to correspond to the broadcasting behaviour of numpy.
+    This is meant to correspond to the broadcasting behavior of numpy.
 
     For example, the fundamental rank for numpy.sin is 0 as it is defined
     for scalar values. If the input array has shape S then so does the output,
-    the function call is automatically boradcast over the input dimensions.
+    the function call is automatically broadcast over the input dimensions.
 
     This function is intended as a decorator, which transforms the function
     to automatically broadcast. For example, if ``foo`` is a function
@@ -123,12 +158,14 @@ def auto_vmap(*ranks_pos: Union[int, Any, None],
             def _foo(mat, s):
                 return jnp.linalg.det(mat) * s
 
-    If an argument should not be vmapped over, the rank can be set to
+    If an argument should not be vmap'ed over, the rank can be set to
     ``None`` or omitted.
 
-    The ranks should typically be positive integers.
-    Just like vmap, they can also be pytrees of integers that mache the
+    The ranks should be positive integers (or zero).
+    Just like vmap, they can also be pytrees of integers that match the
     corresponding input arguments.
+    If the input is a pytree but the specified rank is an integer,
+    the same rank is assumed for all leaves of the input pytree.
 
     Examples:
         First, define an example function where x must be
