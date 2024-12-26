@@ -7,7 +7,7 @@ name = "jax_autovmap"
 authors = [
     { name="Mathis Gerdes", email="mathisgerdes@gmail.com" },
 ]
-description = "Automatically broadcast inputs by dynamically applying jax.vmap"
+description = "Automatically broadcast inputs by dynamically applying jax.vmap given un-batched argument dimensions."
 readme = "README.md"
 requires-python = ">=3.7"
 classifiers = [
@@ -16,9 +16,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    'jax>=0.2.20',
-    'jaxlib>=0.1.69',
-    'numpy',
+    'jax>=0.4.0',
     'importlib-metadata; python_version<"3.8"',
 ]
 dynamic = ["version"]
