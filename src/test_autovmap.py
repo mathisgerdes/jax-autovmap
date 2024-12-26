@@ -9,14 +9,14 @@ from jax_autovmap import auto_vmap
 class AutoVmapTests(TestCase):
     def assertAllEqual(self, x, y):
         x, y = map(np.asarray, (x, y))
-        self.assertTrue(np.alltrue(x == y))
+        self.assertTrue(np.all(x == y))
 
     def assertAllClose(self, x, y):
         x, y = map(np.asarray, (x, y))
-        self.assertTrue(np.allclose(x, y))
+        self.assertTrue(np.all(x, y))
 
     def assertAllTrue(self, t):
-        self.assertTrue(np.alltrue(t))
+        self.assertTrue(np.all(t))
 
     def test_basic(self):
 
