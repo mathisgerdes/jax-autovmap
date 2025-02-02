@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 
 
 def _is_numeric(value):
@@ -114,6 +114,8 @@ def _vmap_wrapped(fun, sig, vmap_count, *args):
         for arg, param in zip(all_args, sig.parameters.values()):
             if param.kind == param.KEYWORD_ONLY:
                 kwargs[param.name] = arg
+            elif param.kind == param.VAR_POSITIONAL:
+                positional.extend(arg)
             else:
                 positional.append(arg)
         bound = sig.bind(*positional, **kwargs)

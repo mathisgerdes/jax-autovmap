@@ -73,6 +73,16 @@ class AutoVmapTests(TestCase):
                 np.full((4, 3), 7),
             )
 
+    def test_varargs(self):
+        @auto_vmap(x=1, b=0)
+        def foo(x, *args, b=0, c=1):
+            return jnp.sum(x) + sum(args) + b + c
+
+        self.assertAllEqual(
+            foo(jnp.ones((3, 3)), 1, 2, 3, b=jnp.zeros((3,))),
+            np.array([10] * 3),
+        )
+
     def test_pytree(self):
         def sum_ranks(objects, offset):
             total = offset
