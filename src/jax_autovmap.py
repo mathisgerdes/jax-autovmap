@@ -47,10 +47,18 @@ def _broadcast_vmap(fn, in_axes):
         axes_squeezed = []
         do_squeeze = False
         for arg, ax in zip(args, in_axes):
+            # nothing to do for arguments that are not auto-vmap'ed
+            if ax is None:
+                args_squeezed.append(arg)
+                axes_squeezed.append(ax)
+                continue
+
             arg_leaves, treedef = jax.tree.flatten(arg)
-            if ax is None or isinstance(ax, int):
+            if isinstance(ax, int):
+                # apply int to all leaves
                 ax_leaves = [ax] * len(arg_leaves)
             else:
+                # must be matching pytree of ints
                 ax_leaves = treedef.flatten_up_to(ax)
 
             for i, (arg_leaf, ax_leaf) in enumerate(zip(arg_leaves, ax_leaves, strict=True)):
