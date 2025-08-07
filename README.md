@@ -46,27 +46,27 @@ Sometimes, the best solution is one of the above.
 This module provides another more flexible solution.
 If the ranks the function *wants* are known, we can derive which arguments have (leading) batch dimensions.
 Based on that, we can apply `jax.vmap` appropriately.
-That is exactly what the `auto_vmap` wrapper does.
+That is exactly what the `autovmap` wrapper does.
 Thanks to `jax.jit`, after the transformed function is JIT-compiled, there is no price to pay for this extra flexibility since it only depends on the statically-known input shapes.
 
 We can define the more flexible function as follows:
 ```python
-from jax_autovmap import auto_vmap
+from jax_autovmap import autovmap
 
-@auto_vmap(s=0, v=1, m=2)
+@autovmap(s=0, v=1, m=2)
 def foo(s, v, m):
     return v @ m @ v + s * v.size
 
 foo(s, v, m)  # returns [15. 15. 15. 15. 15.]
 ```
-The ranks can be specified by keyword argument as above, or positionally (in this case `@auto_vmap(0, 1, 2)`).
+The ranks can be specified by keyword argument as above, or positionally (in this case `@autovmap(0, 1, 2)`).
 This does not have to be applied to all input arguments.
 They can either be omitted or, if ranks are given positionally, specified as `None`.
 
 If the arguments are pytrees (python structures of arrays) and the rank is a single integer, all constituents (leaves) are assumed to have that rank.
 Alternatively, the rank can be a matching pytree, just like the `in_axes` in `jax.vmap`:
 ```python
-@auto_vmap({'s': 0, 'v': 1, 'm': 2})
+@autovmap({'s': 0, 'v': 1, 'm': 2})
 def foo(inputs):
     return inputs['v'] @ inputs['m'] @ inputs['v'] + inputs['s']
 
@@ -79,7 +79,7 @@ s = jnp.array(2.0)
 v = jnp.ones((7, 1, 3))  # broadcast second axis with vmap over 5 values of `m`
 m = jnp.ones((7, 5, 3, 3))
 
-@auto_vmap(s=0, v=1, m=2)
+@autovmap(s=0, v=1, m=2)
 def foo(s, v, m):
     return v @ m @ v + s
 

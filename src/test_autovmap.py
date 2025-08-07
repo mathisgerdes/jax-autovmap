@@ -3,7 +3,7 @@ from unittest import TestCase
 import jax.numpy as jnp
 import numpy as np
 
-from jax_autovmap import auto_vmap
+from jax_autovmap import autovmap
 
 
 class AutoVmapTests(TestCase):
@@ -34,7 +34,7 @@ class AutoVmapTests(TestCase):
         ]
 
         for args, kwargs in possible_args:
-            vmapped = auto_vmap(*args, **kwargs)(foo)
+            vmapped = autovmap(*args, **kwargs)(foo)
 
             # no vmap
             self.assertEqual(
@@ -74,7 +74,7 @@ class AutoVmapTests(TestCase):
             )
 
     def test_varargs(self):
-        @auto_vmap(x=1, b=0)
+        @autovmap(x=1, b=0)
         def foo(x, *args, b=0, c=1):
             return jnp.sum(x) + sum(args) + b + c
 
@@ -95,17 +95,17 @@ class AutoVmapTests(TestCase):
         obj = {n: np.ones((2,) * r) for r, n in zip(ranks, names)}
 
         # each is rank 5 so the sum is just the number of arguments
-        total = auto_vmap(1, 0)(sum_ranks)(obj, 0)
+        total = autovmap(1, 0)(sum_ranks)(obj, 0)
         self.assertEqual(total.ndim, max(ranks) - 1)
         self.assertAllEqual(total, len(ranks))
-        total = auto_vmap(1, 0)(sum_ranks)(obj, 1)
+        total = autovmap(1, 0)(sum_ranks)(obj, 1)
         self.assertAllEqual(total, len(ranks) + 1)
 
         # rank is 2 so two times the number of arguments
         names = 'abcd'
         ranks = [2, 5, 3, 2]
         obj = {n: np.ones((2,) * r) for r, n in zip(ranks, names)}
-        total = auto_vmap(2, 0)(sum_ranks)(obj, 0)
+        total = autovmap(2, 0)(sum_ranks)(obj, 0)
         self.assertEqual(total.ndim, max(ranks) - 2)
         self.assertAllEqual(total, 2 * len(ranks))
 
@@ -121,7 +121,7 @@ class AutoVmapTests(TestCase):
         ranks = [2, 5, 3, 2]
         obj = {n: np.ones((2,) * r) for r, n in zip(ranks, names)}
         arg_ranks = {'a': 1, 'b': 2, 'c': 1, 'd': 0}
-        total = auto_vmap(arg_ranks, 0)(sum_ranks)(obj, 0)
+        total = autovmap(arg_ranks, 0)(sum_ranks)(obj, 0)
         self.assertAllEqual(total, 1 + 2 + 1 + 0)
         total_rank = max(r - arg_ranks[n] for r, n in zip(ranks, names))
         self.assertAllEqual(total.ndim, total_rank)

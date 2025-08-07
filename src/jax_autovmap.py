@@ -9,7 +9,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-__version__ = '0.2.1'
+__version__ = '0.3.0'
 
 
 def _is_numeric(value):
@@ -136,7 +136,7 @@ def _vmap_wrapped(fun, sig, vmap_count, *args):
     return wrapped(*args)
 
 
-def auto_vmap(*ranks_pos: Union[int, Any, None],
+def autovmap(*ranks_pos: Union[int, Any, None],
               **ranks_kw: Union[int, Any, None]):
     """Automatically vmap over arguments of a function.
 
@@ -183,7 +183,7 @@ def auto_vmap(*ranks_pos: Union[int, Any, None],
 
         >>> def foo(mat, s):
         ...   return jnp.linalg.det(mat) * s
-        >>> foo = auto_vmap(x=2, y=0)(foo)
+        >>> foo = autovmap(x=2, y=0)(foo)
         >>> mat, scalars = jnp.zeros((3, 3)), [0.0, 1.0, 2.0] # some inputs
         >>> out = foo(mat, scalars) # will automatically vmap over second arg
         >>> len(out) == len(scalars) # one output per scalar in inputs
@@ -245,4 +245,8 @@ def auto_vmap(*ranks_pos: Union[int, Any, None],
     return wrapper
 
 
-__all__ = ['auto_vmap']
+# for backwards compatibility
+auto_vmap = autovmap
+
+
+__all__ = ['auto_vmap', 'autovmap']
