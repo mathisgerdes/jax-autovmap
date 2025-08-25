@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from functools import partial, wraps
 from inspect import signature
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Sequence, Union
 
 import jax
 import jax.numpy as jnp
@@ -12,35 +12,49 @@ import numpy as np
 __version__ = '0.3.0'
 
 
-def _is_numeric(value):
+def _is_numeric(value: Any) -> bool:
     """True if input is a numpy/jax array or scalar value."""
     return isinstance(
         value, (jax.Array, np.ndarray, np.generic, float, complex, bool, int)
     ) or hasattr(value, "__jax_array__")
 
 
-def _vmap_count(arg, rank, name):
-    """Get number of leading dimensions we need to vmap over"""
+def _validate_rank_args(ranks_pos: tuple, ranks_kw: dict[str, Any]) -> Union[tuple, dict[str, Any]]:
+    """Validate and return the appropriate rank specification."""
+    if len(ranks_pos) > 0:
+        if len(ranks_kw) > 0:
+            raise ValueError(
+                'Cannot mix positional and keyword rank specifications. '
+                f'Got positional: {ranks_pos}, keyword: {ranks_kw}')
+        return ranks_pos
+    elif len(ranks_kw) > 0:
+        return ranks_kw
+    else:
+        # No ranks specified - return identity decorator
+        return None
+
+
+def _vmap_count(arg: Any, rank: int, name: str) -> int:
+    """Get number of leading dimensions we need to vmap over."""
     ndim = jnp.ndim(arg)
     if ndim == rank:
         return 0  # no vmap, rank matches expectation
     if ndim < rank:
         raise ValueError(
-            f'Rank of array passed to `{name}` too small. '
-            f'Got shape {jnp.shape(arg)} but expected '
-            f'at least rank {rank}.')
+            f'Array "{name}" has rank {ndim} but expected at least {rank}. '
+            f'Got shape {jnp.shape(arg)}.')
     return ndim - rank
 
 
-def _vmap_axes(vmap_rank, level):
+def _vmap_axes(vmap_rank: int, level: int) -> Optional[int]:
     """Choose vmap axis (None or 0) given vmap rank and level."""
     return 0 if vmap_rank > level else None
 
 
-def _broadcast_vmap(fn, in_axes):
+def _broadcast_vmap(fn: Callable, in_axes: Sequence[Any]) -> Callable:
     """Functions like vmap, except axes are allowed to be size 1 for broadcasting.
 
-    Additionally assumes in_axes are all either 0 or None.
+    Assumes in_axes are all either 0 or None.
     """
     def _wrapped(*args):
         args_squeezed = []
@@ -82,35 +96,34 @@ def _broadcast_vmap(fn, in_axes):
 
 def _collect_ranks(
         fun: Callable,
-        rspec: Union[dict[str, Optional[int]], tuple[Optional[int], ...]]) \
-        -> tuple[inspect.Signature, dict]:
+        rspec: Union[dict[str, Optional[int]], Sequence[Optional[int]]]
+    ) -> tuple[inspect.Signature, dict[str, int]]:
     """Parse user provided ranks specification given function."""
     sig = signature(fun)
     arg_list = list(sig.parameters.keys())
+    ranks: dict[str, int] = {}
+
     if isinstance(rspec, dict):
-        ranks = {}
         for name, rank in rspec.items():
             if name not in arg_list:
                 raise RuntimeError(
-                    f'function {fun} has no argument called "{name}" '
-                    f'to dynamically vmap over.')
+                    f'Function has no argument "{name}". '
+                    f'Available arguments: {", ".join(arg_list)}')
             if rank is not None:
                 ranks[name] = rank
     else:
-        ranks = {arg_list[i]: rank
-                 for i, rank in enumerate(rspec)
-                 if rank is not None}
-    for name in ranks:
-        if name not in arg_list:
-            fun_name = fun.__name__ if hasattr(fun, '__name__') else fun
-            raise RuntimeError(
-                f'Specified argument "{name}" does not appear as a '
-                f'parameter of the function "{fun_name}"')
+        for i, rank in enumerate(rspec):
+            if rank is not None and i < len(arg_list):
+                ranks[arg_list[i]] = rank
+            elif rank is not None:
+                raise RuntimeError(
+                    f'Too many positional ranks specified. '
+                    f'Function has {len(arg_list)} arguments but got rank for position {i}')
 
     return sig, ranks
 
 
-def _vmap_wrapped(fun, sig, vmap_count, *args):
+def _vmap_wrapped(fun: Callable, sig: inspect.Signature, vmap_count: Sequence[Any], *args: Any) -> Any:
     """Wrap function in vmap according to counts needed per argument."""
     vmap_depth = max(jax.tree.leaves(vmap_count))
 
@@ -137,67 +150,30 @@ def _vmap_wrapped(fun, sig, vmap_count, *args):
 
 
 def autovmap(*ranks_pos: Union[int, Any, None],
-              **ranks_kw: Union[int, Any, None]):
-    """Automatically vmap over arguments of a function.
+             **ranks_kw: Union[int, Any, None]) -> Callable[[Callable], Callable]:
+    """Automatically vmap over function arguments with specified ranks.
 
-    Given a function with some arguments that have known
-    fundamental ranks, we want make it take any batched inputs.
-    This is meant to correspond to the broadcasting behavior of numpy.
+    Transforms a function to accept batched inputs by applying jax.vmap
+    automatically based on the expected rank of each argument.
 
-    For example, the fundamental rank for numpy.sin is 0 as it is defined
-    for scalar values. If the input array has shape S then so does the output,
-    the function call is automatically broadcast over the input dimensions.
+    Args:
+        *ranks_pos: Positional specification of argument ranks (int, pytree, or None)
+        **ranks_kw: Keyword specification of argument ranks
 
-    This function is intended as a decorator, which transforms the function
-    to automatically broadcast. For example, if ``foo`` is a function
-    which takes as input a matrix (of rank 2) and a scalar (of rank 0),
-    it can be written as follows:
-
-    .. code-block:: python
-
-            @dynamic_vmap(2, 0)
-            def _foo(mat, s):
-                return jnp.linalg.det(mat) * s
-
-    Instead of positionally giving the fundamental ranks, they can also
-    be specified by name:
-
-    .. code-block:: python
-
-            @dynamic_vmap(mat=2, s=0)
-            def _foo(mat, s):
-                return jnp.linalg.det(mat) * s
-
-    If an argument should not be vmap'ed over, the rank can be set to
-    ``None`` or omitted.
-
-    The ranks should be positive integers (or zero).
-    Just like vmap, they can also be pytrees of integers that match the
-    corresponding input arguments.
-    If the input is a pytree but the specified rank is an integer,
-    the same rank is assumed for all leaves of the input pytree.
+    Returns:
+        Decorator that transforms functions to accept batched inputs
 
     Examples:
-        First, define an example function where x must be
-        a matrix (rank 2) and y a scalar (rank 0):
+        @autovmap(2, 0)  # matrix, scalar
+        def det_scale(mat, s):
+            return jnp.linalg.det(mat) * s
 
-        >>> def foo(mat, s):
-        ...   return jnp.linalg.det(mat) * s
-        >>> foo = autovmap(x=2, y=0)(foo)
-        >>> mat, scalars = jnp.zeros((3, 3)), [0.0, 1.0, 2.0] # some inputs
-        >>> out = foo(mat, scalars) # will automatically vmap over second arg
-        >>> len(out) == len(scalars) # one output per scalar in inputs
-        True
+        @autovmap(mat=2, s=0)  # equivalent keyword form
+        def det_scale(mat, s):
+            return jnp.linalg.det(mat) * s
     """
-    if len(ranks_pos) > 0:
-        assert len(ranks_kw) == 0, \
-            f'ranks must either be given positionally or via ' \
-            f'keyword arguments, but got both positional arguments ' \
-            f'{ranks_pos} and keyword arguments {ranks_kw}'
-        arg_rank = ranks_pos
-    elif len(ranks_kw) > 0:
-        arg_rank = ranks_kw
-    else:
+    arg_rank = _validate_rank_args(ranks_pos, ranks_kw)
+    if arg_rank is None:
         return lambda fun: fun
 
     def wrapper(fun):

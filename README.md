@@ -1,4 +1,4 @@
-[![Tests](https://github.com/mathisgerdes/autovmap/actions/workflows/python-pytest.yml/badge.svg)](https://github.com/mathisgerdes/autovmap/actions/workflows/python-package.yml)
+[![Tests](https://github.com/mathisgerdes/autovmap/actions/workflows/python-pytest.yml/badge.svg)](https://github.com/mathisgerdes/autovmap/actions/workflows/python-pytest.yml)
 [![PyPI](https://img.shields.io/pypi/v/jax-autovmap)](https://pypi.org/project/jax-autovmap/)
 # Automatically broadcast via JAX vmap
 
@@ -38,7 +38,7 @@ There are multiple possible ways we can solve this
 
 - We could try to write the function more carefully, so it can take both single and batch inputs.
   Or we could always require the first dimension to be a batch index.
-- Given known inputs, we can transform our function: `jax.jit(foo, (None, 0, 0))`.
+- Given known inputs, we can transform our function: `jax.vmap(foo, (None, 0, 0))`.
   However, the axes change depending on the inputs.
   If we want to expose functions that accept batched inputs to the user, we need to have some clear naming scheme (to indicate which arguments are batched).
 
@@ -84,4 +84,17 @@ def foo(s, v, m):
     return v @ m @ v + s
 
 foo(s, v, m)  # shape (7, 5)
+```
+
+## Development
+
+To run tests:
+```bash
+pip install -e ".[test]"
+pytest
+```
+
+To run tests with coverage:
+```bash
+pytest --cov=src --cov-report=term-missing
 ```
